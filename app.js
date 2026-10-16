@@ -47,7 +47,7 @@ const gallery = [
 ];
 
 const state = {
-  role: "student",
+  role: "visitor",
   view: "home",
   subject: subjects[0].name,
   tasks: demoTasks.map((task) => ({ ...task })),
@@ -314,9 +314,14 @@ function render() {
   if (!allowedViews.includes(state.view)) state.view = "home";
   renderNav();
   renderMain();
-  const displayName = state.role === "teacher" ? "Teacher account" : state.role === "visitor" ? "Visitor access" : "Marienne Trish Abon";
-  profileButton.innerHTML = `<span class="avatar">${initials()}</span><span class="profile-name">${displayName}</span><span class="profile-chevron" aria-hidden="true">v</span>`;
-  profileButton.setAttribute("aria-label", `Current access: ${roleNames[state.role]}. Change access`);
+  if (state.role === "visitor") {
+    profileButton.innerHTML = `<span class="profile-name">Log in</span><span class="profile-chevron" aria-hidden="true">&rsaquo;</span>`;
+    profileButton.setAttribute("aria-label", "Log in to the student or teacher demo view");
+  } else {
+    const displayName = state.role === "teacher" ? "Teacher account" : "Marienne Trish Abon";
+    profileButton.innerHTML = `<span class="avatar">${initials()}</span><span class="profile-name">${displayName}</span><span class="profile-chevron" aria-hidden="true">v</span>`;
+    profileButton.setAttribute("aria-label", `Current access: ${roleNames[state.role]}. Change demo view`);
+  }
 }
 
 function showToast(message) {
@@ -329,11 +334,18 @@ function showToast(message) {
   window.setTimeout(() => toast.remove(), 2600);
 }
 
+function loginFieldsMarkup() {
+  if (state.selectedRole === "teacher") {
+    return `<div class="form-grid"><div class="field"><label for="demo-email">SCHOOL EMAIL</label><input id="demo-email" name="email" type="email" autocomplete="off" required placeholder="teacher@example.edu"></div><div class="field"><label for="demo-teacher-id">TEACHER ID · DEMO ONLY</label><input id="demo-teacher-id" name="teacherId" autocomplete="off" required placeholder="Enter a fictional ID"></div></div>`;
+  }
+  return `<div class="form-grid"><div class="field"><label for="demo-lrn">LRN · DEMO ONLY</label><input id="demo-lrn" name="lrn" autocomplete="off" required placeholder="Enter a fictional LRN"></div><div class="field"><label for="demo-email">SCHOOL EMAIL</label><input id="demo-email" name="email" type="email" autocomplete="off" required placeholder="student@example.edu"></div></div>`;
+}
+
 function openRoleModal() {
-  state.selectedRole = state.role;
+  state.selectedRole = state.role === "visitor" ? "student" : state.role;
   const modal = document.createElement("div");
   modal.className = "modal-backdrop";
-  modal.innerHTML = `<section class="modal" role="dialog" aria-modal="true" aria-labelledby="access-title"><div class="modal-top"><div><div class="eyebrow">UP-DCC ACCOUNT ACCESS</div><h2 id="access-title">Choose a demo view</h2><p>Try the portal as a student, teacher, or public visitor.</p></div><button class="modal-close" aria-label="Close dialog" data-action="close-modal">x</button></div><div class="role-options">${Object.entries(roleNames).map(([key, label]) => `<button class="role-option ${state.selectedRole === key ? "selected" : ""}" data-role="${key}"><span class="role-radio"></span><span><strong>${label}</strong><small>${key === "student" ? "Courses, profile, activities, and grades" : key === "teacher" ? "Classroom tools and sample gradebook" : "Public campus information only"}</small></span></button>`).join("")}</div><div class="modal-note">Prototype only. Do not enter real passwords or personal information. Authentication, teacher ID verification, and approval workflows are not connected.</div><div class="modal-actions"><button class="btn btn-secondary" data-action="close-modal">Cancel</button><button class="btn btn-primary" data-action="continue-role">Continue as ${roleNames[state.selectedRole]}</button></div></section>`;
+  modal.innerHTML = `<section class="modal" role="dialog" aria-modal="true" aria-labelledby="access-title"><div class="modal-top"><div><div class="eyebrow">UP-DCC DEMO SIGN-IN</div><h2 id="access-title">Log in to the portal</h2><p>Select your demo role and enter fictional details.</p></div><button class="modal-close" aria-label="Close dialog" data-action="close-modal">x</button></div><div class="role-options">${Object.entries(roleNames).filter(([key]) => key !== "visitor").map(([key, label]) => `<button type="button" class="role-option ${state.selectedRole === key ? "selected" : ""}" data-role="${key}"><span class="role-radio"></span><span><strong>${label}</strong><small>${key === "student" ? "LRN and school email" : "School email and demo teacher ID"}</small></span></button>`).join("")}</div><form id="login-form"><div id="login-fields">${loginFieldsMarkup()}</div><div class="modal-note">Demo only: no details are checked, sent, or saved. Never enter a real LRN, school email, or teacher ID. Real sign-in requires a secure school-approved backend.</div><div class="modal-actions"><button type="button" class="btn btn-secondary" data-action="close-modal">Cancel</button><button type="submit" class="btn btn-primary">Continue</button></div></form>${state.role !== "visitor" ? '<button type="button" class="text-action" style="margin-top:12px" data-action="visitor-view">Continue as visitor</button>' : ""}</section>`;
   document.body.append(modal);
 }
 
@@ -341,8 +353,7 @@ function updateRoleSelection() {
   const modal = document.querySelector(".modal");
   if (!modal) return;
   modal.querySelectorAll(".role-option").forEach((option) => option.classList.toggle("selected", option.dataset.role === state.selectedRole));
-  const continueButton = modal.querySelector('[data-action="continue-role"]');
-  continueButton.textContent = `Continue as ${roleNames[state.selectedRole]}`;
+  modal.querySelector("#login-fields").innerHTML = loginFieldsMarkup();
 }
 
 function switchRole() {
@@ -350,9 +361,15 @@ function switchRole() {
   state.view = "home";
   document.querySelector(".modal-backdrop")?.remove();
   render();
-  if (state.role === "teacher") showToast("Teacher demo view. No ID was verified.");
-  else if (state.role === "visitor") showToast("Visitor access shows public campus information only.");
-  else showToast("Student demo view loaded.");
+  showToast(`${roleNames[state.role]} demo view opened. No identity was verified.`);
+}
+
+function continueAsVisitor() {
+  state.role = "visitor";
+  state.selectedRole = "student";
+  state.view = "home";
+  document.querySelector(".modal-backdrop")?.remove();
+  render();
 }
 
 function openRoom(name) {
@@ -385,7 +402,7 @@ document.addEventListener("click", (event) => {
   if (target.matches(".profile-trigger")) { openRoleModal(); return; }
   if (target.matches("[data-role]")) { state.selectedRole = target.dataset.role; updateRoleSelection(); return; }
   if (target.dataset.action === "close-modal") { document.querySelector(".modal-backdrop")?.remove(); return; }
-  if (target.dataset.action === "continue-role") { switchRole(); return; }
+  if (target.dataset.action === "visitor-view") { continueAsVisitor(); return; }
   if (target.dataset.floor) { state.floor = Number(target.dataset.floor); state.selectedLocation = ""; render(); return; }
   if (target.dataset.location) { openRoom(target.dataset.location); return; }
   if (target.dataset.subject) { state.subject = target.dataset.subject; render(); return; }
@@ -421,6 +438,17 @@ document.addEventListener("change", (event) => {
 });
 
 document.addEventListener("submit", (event) => {
+  if (event.target.matches("#login-form")) {
+    event.preventDefault();
+    const requiredFields = [...event.target.querySelectorAll("input[required]")];
+    if (requiredFields.some((field) => !field.value.trim())) {
+      showToast("Enter fictional demo values to continue.");
+      return;
+    }
+    event.target.reset();
+    switchRole();
+    return;
+  }
   if (event.target.matches("#submission-form")) {
     event.preventDefault();
     const file = new FormData(event.target).get("file");
